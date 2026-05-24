@@ -1,25 +1,17 @@
-@import "tailwindcss/base";
-@import "tailwindcss/components";
-@import "tailwindcss/utilities";
-
-/* Use Tailwind's `darkMode: 'class'` in tailwind.config.js to enable
-  class-based dark mode. The former `@custom-variant` at-rule is not
-  valid for standard Tailwind/PostCSS setups and prevents styles from loading. */
+@import "tailwindcss";
 
 :root {
-  --background: #f8fafc; /* Tailwind slate-50 styling */
-  --foreground: #0f172a; /* Tailwind slate-900 styling */
+  --background: #f8fafc;
+  --foreground: #0f172a;
 }
 
-/* 2. Configure standard native class overrides for our variable states */
-@layer theme {
+@layer base {
   .dark {
-    --background: #020617; /* Tailwind slate-950 styling */
-    --foreground: #f8fafc; /* Tailwind slate-50 styling */
+    --background: #020617;
+    --foreground: #f8fafc;
   }
 }
 
-/* 3. Base styles application */
 @layer base {
   body {
     background-color: var(--background);
