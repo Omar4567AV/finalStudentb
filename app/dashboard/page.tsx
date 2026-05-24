@@ -28,32 +28,37 @@ export default function DashboardPage() {
   const [actionLoadingUid, setActionLoadingUid] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (!firebaseUser) {
-        router.push("/login");
-        return;
-      }
+    let unsubscribe: (() => void) | undefined;
 
-      try {
-        const userRef = doc(db, "users", firebaseUser.uid);
-        const userSnapshot = await getDoc(userRef);
-        const ADMIN_UID = "YUAgwW55qdZnrw4yX2KfDAlajVg2";
-        const role: "admin" | "student" = firebaseUser.uid === ADMIN_UID
-          ? "admin"
-          : userSnapshot.exists()
-          ? (userSnapshot.data().role as "admin" | "student") || "student"
-          : "student";
+    auth.authStateReady().then(() => {
+      unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+        if (!firebaseUser) {
+          router.push("/login");
+          setLoading(false);
+          return;
+        }
 
-        setUser({ uid: firebaseUser.uid, email: firebaseUser.email ?? "", role });
-      } catch (err) {
-        console.error("Firestore role fetch error:", err);
-        router.push("/login");
-      } finally {
-        setLoading(false);
-      }
+        try {
+          const userRef = doc(db, "users", firebaseUser.uid);
+          const userSnapshot = await getDoc(userRef);
+          const ADMIN_UID = "YUAgwW55qdZnrw4yX2KfDAlajVg2";
+          const role: "admin" | "student" = firebaseUser.uid === ADMIN_UID
+            ? "admin"
+            : userSnapshot.exists()
+            ? (userSnapshot.data().role as "admin" | "student") || "student"
+            : "student";
+
+          setUser({ uid: firebaseUser.uid, email: firebaseUser.email ?? "", role });
+        } catch (err) {
+          console.error("Firestore role fetch error:", err);
+          router.push("/login");
+        } finally {
+          setLoading(false);
+        }
+      });
     });
 
-    return () => unsubscribe();
+    return () => unsubscribe?.();
   }, [router]);
 
   useEffect(() => {

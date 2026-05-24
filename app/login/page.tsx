@@ -34,10 +34,21 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (response.ok && data.success) {
-        console.log("Login successful! Redirecting session context to root home portal...");
-        
-        // 3. CORRECTED: Pull window view straight into your root layout folder page (/)
-        window.location.href = "/";
+        const otpResponse = await fetch("/api/auth/send-otp", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: user.email }),
+        });
+        const otpData = await otpResponse.json();
+
+        if (otpResponse.ok && otpData.success) {
+          sessionStorage.setItem("pending_otp_email", user.email ?? "");
+          sessionStorage.setItem("pending_otp_uid", user.uid);
+          sessionStorage.setItem("expected_dev_code", otpData.devCode);
+          router.push("/otp");
+        } else {
+          setErrorMessage(otpData.error || "Failed to send OTP.");
+        }
       } else {
         setErrorMessage(data.error || "Failed to create an application session mapping.");
       }
