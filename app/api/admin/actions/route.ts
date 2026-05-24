@@ -1,54 +1,58 @@
+// app/api/auth/session/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
-import { doc, setDoc, deleteDoc, collection, addDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
-    const adminEmail = request.headers.get('x-user-email') || 'Unknown Admin';
-    const { studentId, name, email, major } = await request.json();
-
-    if (!studentId || !name || !email || !major) {
-      return NextResponse.json({ error: 'Missing required profile values.' }, { status: 400 });
+    const body = await request.json().catch(() => null);
+    if (!body || !body.uid) {
+      return NextResponse.json({ error: 'Missing identifiers' }, { status: 400 });
     }
 
-    const timestamp = new Date().toISOString();
+    const { uid, email } = body;
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanUid = uid.trim();
 
-    await setDoc(doc(db, 'students', studentId), { name, email, major, createdAt: timestamp });
-    await setDoc(doc(db, 'users', studentId), { email, role: 'student' });
-    await addDoc(collection(db, 'logs'), {
-      action: `PROVISION_STUDENT: Added ${name} (${studentId})`,
-      performedBy: adminEmail,
-      timestamp,
-    });
+    // Default fallback
+    let assignedRole = 'student'; 
 
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    return NextResponse.json({ error: 'Internal data mutation fault.' }, { status: 500 });
-  }
-}
-
-export async function DELETE(request: NextRequest) {
-  try {
-    const adminEmail = request.headers.get('x-user-email') || 'Unknown Admin';
-    const { searchParams } = new URL(request.url);
-    const targetId = searchParams.get('id');
-
-    if (!targetId) {
-      return NextResponse.json({ error: 'Missing ID reference parameter.' }, { status: 400 });
+    // HARDCODED ADMIN BACKUP SAFETY NET: 
+    // If it's your primary email, force it to admin instantly regardless of database connection status!
+    if (cleanEmail === "o68halabi@gmail.com" || cleanUid === "YUAgwW55qdZnrw4yX2KfDAlajVg2") {
+      assignedRole = 'admin';
+      console.log(`🛡️ Admin Backup Safety Net triggered for: ${cleanEmail}`);
+    } else {
+      // Otherwise, lookup normal users in Firestore
+      try {
+        const userDocRef = doc(db, 'users', cleanUid);
+        const userSnapshot = await getDoc(userDocRef);
+        
+        if (userSnapshot.exists()) {
+          const userData = userSnapshot.data();
+          assignedRole = userData.role || 'student';
+        }
+      } catch (firestoreError) {
+        console.error("Firestore read error, defaulting to student:", firestoreError);
+      }
     }
 
-    const timestamp = new Date().toISOString();
-
+    // Serialize session response block
+    const response = NextResponse.json({ success: true, role: assignedRole });
     
-    await deleteDoc(doc(db, 'users', targetId));
-    await addDoc(collection(db, 'logs'), {
-      action: `REVOKE_STUDENT: Deleted reference ${targetId}`,
-      performedBy: adminEmail,
-      timestamp,
+    response.cookies.set('portal_session', JSON.stringify({ uid: cleanUid, email: cleanEmail, role: assignedRole }), {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7200, // 2 Hours
+      path: '/',
     });
 
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    return NextResponse.json({ error: 'Internal data mutation fault.' }, { status: 500 });
+    return response;
+
+  } catch (err: any) {
+    return NextResponse.json({ error: 'Internal server error', details: err.message }, { status: 500 });
   }
 }

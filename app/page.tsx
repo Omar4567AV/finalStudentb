@@ -1,6 +1,7 @@
 // app/page.tsx
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache"; // ✅ FIXED: Added for instant layout updates
 import { db } from "@/lib/firebase";
 import { doc, setDoc, deleteDoc, collection, getDocs } from "firebase/firestore";
 
@@ -64,11 +65,14 @@ export default async function HomePage() {
         email: studentEmail.trim(),
         role: "student",
       });
+      
+      // ✅ FIXED: Force cache clearing for instant visual UI updates
+      revalidatePath("/");
     } catch (error) {
       console.error("Failed to add student to Firestore:", error);
     }
     
-    redirect("/"); // Instantly revalidates and refreshes the layout view feed
+    redirect("/"); 
   }
 
   // Action to completely remove a student role mapping document
@@ -80,11 +84,14 @@ export default async function HomePage() {
 
     try {
       await deleteDoc(doc(db, "users", targetUid));
+      
+      // ✅ FIXED: Force cache clearing for instant visual UI updates
+      revalidatePath("/");
     } catch (error) {
       console.error("Failed to eliminate student record from Firestore:", error);
     }
 
-    redirect("/"); // Instantly revalidates and refreshes the layout view feed
+    redirect("/"); 
   }
 
   // Action to clear out cookies and sign out

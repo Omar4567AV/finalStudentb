@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { onAuthStateChanged } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
 
 interface UserSession {
   uid: string;
@@ -15,28 +18,29 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const checkSession = () => {
-      try {
-        const cookies = document.cookie.split("; ");
-        const sessionCookie = cookies.find((row) => row.startsWith("portal_session="));
-        
-        if (!sessionCookie) {
-          // If no active credential cookie exists, drop them back to login gateway
-          router.push("/login");
-          return;
-        }
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (!firebaseUser) {
+        router.push("/login");
+        return;
+      }
 
-        const rawJson = decodeURIComponent(sessionCookie.split("=")[1]);
-        setUser(JSON.parse(rawJson));
+      try {
+        const userRef = doc(db, "users", firebaseUser.uid);
+        const userSnapshot = await getDoc(userRef);
+        const role = userSnapshot.exists()
+          ? (userSnapshot.data().role as "admin" | "student") || "student"
+          : "student";
+
+        setUser({ uid: firebaseUser.uid, email: firebaseUser.email ?? "", role });
       } catch (err) {
-        console.error("Session profile reading exception:", err);
+        console.error("Firestore role fetch error:", err);
         router.push("/login");
       } finally {
         setLoading(false);
       }
-    };
+    });
 
-    checkSession();
+    return () => unsubscribe();
   }, [router]);
 
   if (loading) {
