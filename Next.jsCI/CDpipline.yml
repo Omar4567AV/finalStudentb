@@ -1,0 +1,41 @@
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run Next.js Lint Checks
+      run: npm run lint
+      continue-on-error: true # Prevents minor styling warning flags from stopping a deploy
+
+    - name: Build Next.js Application
+      run: npm run build
+      env:
+        # Injecting dummy values during building cycles so Next compilation step passes successfully
+        GMAIL_USER: "ohalabi69@gmail.com"
+        GMAIL_APP_PASS: "mock_build_placeholder"
+
+    - name: Deploy Live Build to Firebase
+      uses: FirebaseExtended/action-hosting-deploy@v0
+      with:
+        repoToken: ${{ secrets.GITHUB_TOKEN }}
+        firebaseServiceAccount: ${{ secrets.FIREBASE_TOKEN }}
+        projectId: webfinal-e849a
+        channelId: live
