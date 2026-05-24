@@ -1,33 +1,106 @@
-import { cookies } from 'next/headers';
-import { verifySessionToken } from '@/lib/tokens';
-import AdminControls from '@/features/admin/components/AdminControls';
-import SystemLogs from '@/features/admin/components/SystemLogs';
-import StudentView from '@/features/student/components/StudentView';
+"use client";
 
-export default async function DashboardPage() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get('portal_session')?.value;
-  const identity = await verifySessionToken(token!);
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
-  const isAdmin = identity?.role === 'admin';
+interface UserSession {
+  uid: string;
+  email: string;
+  role: "admin" | "student";
+}
+
+export default function HomePage() {
+  const router = useRouter();
+  const [user, setUser] = useState<UserSession | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const checkSession = () => {
+      try {
+        const cookies = document.cookie.split("; ");
+        const sessionCookie = cookies.find((row) => row.startsWith("portal_session="));
+        
+        if (!sessionCookie) {
+          // If no active credential cookie exists, drop them back to login gateway
+          router.push("/login");
+          return;
+        }
+
+        const rawJson = decodeURIComponent(sessionCookie.split("=")[1]);
+        setUser(JSON.parse(rawJson));
+      } catch (err) {
+        console.error("Session profile reading exception:", err);
+        router.push("/login");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkSession();
+  }, [router]);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-black">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-zinc-300 border-t-black dark:border-t-white" />
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-8">
-      <div className="border-b border-slate-200 dark:border-slate-800 pb-4">
-        <h2 className="text-2xl font-bold tracking-tight">Welcome back, {identity?.email}</h2>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          Authorization Scope: <span className="font-mono text-blue-500 font-semibold uppercase">{identity?.role}</span>
-        </p>
-      </div>
+    <div className="min-h-screen bg-zinc-50 p-6 font-sans text-black dark:bg-black dark:text-zinc-100 sm:p-10">
+      <div className="mx-auto max-w-5xl">
+        
+        {/* Core Shared Header Panel */}
+        <header className="mb-8 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-zinc-200 pb-6 dark:border-zinc-800">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Main Portal Workspace</h1>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              Logged in as: <span className="font-semibold text-zinc-800 dark:text-zinc-200">{user?.email}</span> 
+              <span className="ml-2 inline-flex items-center rounded-md bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200 uppercase">
+                {user?.role}
+              </span>
+            </p>
+          </div>
+          
+          <button 
+            onClick={() => {
+              document.cookie = "portal_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+              window.location.href = "/login";
+            }}
+            className="self-start rounded-xl border border-zinc-200 bg-white px-4 py-2 text-sm font-medium shadow-sm hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900"
+          >
+            Sign Out
+          </button>
+        </header>
 
-      {isAdmin ? (
-        <div className="space-y-8">
-          <AdminControls />
-          <SystemLogs />
-        </div>
-      ) : (
-        <StudentView />
-      )}
+        {/* Features Content Row Block */}
+        <main className="grid gap-6 md:grid-cols-2">
+          
+          {/* Shared Content Module Card */}
+          <section className="rounded-2xl border border-zinc-100 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+            <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">General Portal Feed</h2>
+            <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">Core operational feeds accessible to all active accounts.</p>
+          </section>
+
+          {/* ADMIN CARD OVERLAY BLOCK */}
+          {user?.role === "admin" && (
+            <section className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm dark:border-red-950/30 dark:bg-zinc-950">
+              <h2 className="text-xl font-bold text-red-600 dark:text-red-400">🛡️ Administrative Control Panel</h2>
+              <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">Administrative system management dashboard access granted.</p>
+            </section>
+          )}
+
+          {/* STUDENT CARD OVERLAY BLOCK */}
+          {user?.role === "student" && (
+            <section className="rounded-2xl border border-blue-100 bg-white p-6 shadow-sm dark:border-blue-950/30 dark:bg-zinc-950">
+              <h2 className="text-xl font-bold text-blue-600 dark:text-blue-400">🎓 Student Portal Features</h2>
+              <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">Curriculum reports and academic schedules are active.</p>
+            </section>
+          )}
+
+        </main>
+      </div>
     </div>
   );
 }
