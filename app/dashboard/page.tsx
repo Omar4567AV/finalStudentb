@@ -37,7 +37,10 @@ export default function DashboardPage() {
       try {
         const userRef = doc(db, "users", firebaseUser.uid);
         const userSnapshot = await getDoc(userRef);
-        const role = userSnapshot.exists()
+        const ADMIN_UID = "YUAgwW55qdZnrw4yX2KfDAlajVg2";
+        const role: "admin" | "student" = firebaseUser.uid === ADMIN_UID
+          ? "admin"
+          : userSnapshot.exists()
           ? (userSnapshot.data().role as "admin" | "student") || "student"
           : "student";
 
